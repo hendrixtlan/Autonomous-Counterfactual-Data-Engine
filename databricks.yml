@@ -1,0 +1,83 @@
+bundle:
+  name: temporalx
+
+variables:
+  cluster_id:
+    description: Existing Databricks cluster ID with an appropriate Spark runtime
+  catalog:
+    description: Existing Unity Catalog catalog with CREATE TABLE permission
+  schema:
+    description: Existing Unity Catalog schema for isolated research tables
+
+resources:
+  jobs:
+    temporalx_sprint01:
+      name: temporalx-sprint01
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: compare_policies
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./spark/compare.py
+    temporalx_sprint02:
+      name: temporalx-sprint02
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: archive_captures
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./spark/sprint02.py
+            parameters: [seed, --catalog, '${var.catalog}', --schema, '${var.schema}', --phase, captures, --batch-version, '1']
+        - task_key: archive_refunds
+          depends_on:
+            - task_key: archive_captures
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./spark/sprint02.py
+            parameters: [seed, --catalog, '${var.catalog}', --schema, '${var.schema}', --phase, refunds, --batch-version, '2']
+        - task_key: materialize_silver
+          depends_on:
+            - task_key: archive_refunds
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./spark/sprint02.py
+            parameters: [silver, --catalog, '${var.catalog}', --schema, '${var.schema}']
+        - task_key: compare_with_oracle
+          depends_on:
+            - task_key: materialize_silver
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./spark/sprint02.py
+            parameters: [compare, --catalog, '${var.catalog}', --schema, '${var.schema}', --run-id, demo-full, --assert-fixture]
+
+    # Execute explicitly AFTER temporalx_sprint02, in a disposable lab schema.
+    # This job never writes to any production table.
+    temporalx_sandbox_cdf_demo:
+      name: temporalx-sandbox-cdf-demo
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: publish_bad_baseline
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./spark/sprint02.py
+            parameters: [publish, --catalog, '${var.catalog}', --schema, '${var.schema}', --run-id, demo-full, --policy, v1, --approve-sandbox]
+        - task_key: publish_candidate
+          depends_on:
+            - task_key: publish_bad_baseline
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./spark/sprint02.py
+            parameters: [publish, --catalog, '${var.catalog}', --schema, '${var.schema}', --run-id, demo-full, --policy, v2, --approve-sandbox]
+        - task_key: inspect_changes
+          depends_on:
+            - task_key: publish_candidate
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./spark/sprint02.py
+            parameters: [cdf, --catalog, '${var.catalog}', --schema, '${var.schema}', --starting-version, '0']
+
+targets:
+  dev:
+    default: true
+    mode: development
+
