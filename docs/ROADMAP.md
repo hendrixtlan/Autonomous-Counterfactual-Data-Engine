@@ -32,3 +32,17 @@
 - MLflow trace / experiment lineage linked to replay evidence hashes.
 - Policy-controlled, human-approved recovery candidate generation.
 - Cost, time-to-recovery, nondeterminism and reliability measurements.
+
+
+## Sprint 03 — implemented, workspace validation pending
+- SQLite atomic stateful microbatch checkpoint and replay branches.
+- Separate source-offset identity, business-event deduplication, late watermark quarantine.
+- Optional Redpanda Compose + producer and SQLite consumer using broker offsets.
+- Databricks Kafka Delta Bronze, watermarked window branches, isolated replay code.
+- Explicit boundary: local reference passed, Docker/Databricks not executed.
+
+## Sprint 04 candidate — actual distributed reliability lab
+- Integration-test Redpanda + Spark, crash/restart injection, and RocksDB state store.
+- Structured Streaming progress metrics and watermark monitoring.
+- Validate Delta replay vs reference outputs under known microbatch ordering.
+- Flink vs Spark replay benchmark or state-store migration (separate research claim).

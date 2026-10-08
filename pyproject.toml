@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "temporalx-lab"
-version = "0.2.0"
-description = "A reproducible reference engine for bitemporal replay, local event archive, and Databricks Delta workflows"
+version = "0.3.0"
+description = "A reproducible reference engine for bitemporal replay, local event archive, checkpoint-isolated state recovery, Kafka, and Databricks Delta workflows"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -14,6 +14,7 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest>=8.0", "PyYAML>=6.0"]
+kafka = ["confluent-kafka>=2.4,<3"]
 
 [project.scripts]
 temporalx = "temporalx.cli:main"

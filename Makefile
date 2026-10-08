@@ -12,3 +12,21 @@ benchmark:
 archive-demo:
 	python -m temporalx archive-ingest --db artifacts/temporalx.db --input examples/demo_events.jsonl --batch-id demo-001
 	python -m temporalx archive-compare --db artifacts/temporalx.db --run-id replay-001
+
+sprint03-demo:
+	PYTHONPATH=src python scripts/local_stream_demo.py --db artifacts/stateful-s03.db
+
+kafka-up:
+	docker compose up -d
+
+kafka-down:
+	docker compose down
+
+kafka-topic:
+	docker compose exec redpanda rpk topic create temporalx.transactions -p 2
+
+kafka-batch01:
+	python scripts/produce_kafka.py --batch 01
+
+kafka-batch02:
+	python scripts/produce_kafka.py --batch 02

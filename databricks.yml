@@ -9,6 +9,16 @@ variables:
   schema:
     description: Existing Unity Catalog schema for isolated research tables
 
+  kafka_bootstrap:
+    description: Kafka broker network-reachable from Databricks compute (NOT your laptop's localhost)
+    default: REPLACE_WITH_REACHABLE_KAFKA_HOST:9092
+  kafka_topic:
+    description: Synthetic topic; use a disposable Kafka namespace
+    default: temporalx.transactions
+  checkpoint_root:
+    description: Pre-created UC Volume checkpoint path; must begin with /Volumes/
+    default: /Volumes/REPLACE_ME/schema/volume/checkpoints
+
 resources:
   jobs:
     temporalx_sprint01:
@@ -75,6 +85,44 @@ resources:
           spark_python_task:
             python_file: ./spark/sprint02.py
             parameters: [cdf, --catalog, '${var.catalog}', --schema, '${var.schema}', --starting-version, '0']
+
+
+    # Each run is explicitly initiated. Do NOT automatically backfill/publish.
+    temporalx_sprint03_capture:
+      name: temporalx-sprint03-kafka-to-delta
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: capture_kafka
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./streaming/databricks_stream.py
+            parameters: [capture, --catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --bootstrap, '${var.kafka_bootstrap}', --topic, '${var.kafka_topic}']
+
+    temporalx_sprint03_state:
+      name: temporalx-sprint03-stateful-branches
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: state_baseline
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./streaming/databricks_stream.py
+            parameters: [stream, --catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --policy, v1, --branch, baseline_v1]
+        - task_key: state_candidate
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./streaming/databricks_stream.py
+            parameters: [stream, --catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --policy, v2, --branch, candidate_v2]
+
+    # Run only when explicitly authorized to create isolated new research tables.
+    temporalx_sprint03_recovery:
+      name: temporalx-sprint03-isolated-recovery
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: reconstruct_from_bronze
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./streaming/databricks_stream.py
+            parameters: [backfill, --catalog, '${var.catalog}', --schema, '${var.schema}', --branch, repair_001]
 
 targets:
   dev:

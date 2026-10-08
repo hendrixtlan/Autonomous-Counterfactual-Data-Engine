@@ -1,6 +1,41 @@
 # TemporalX — Autonomous Counterfactual Data Engine
 
-**Sprint 02 (v0.2.0): durable event archive + Databricks Delta / Unity Catalog experiment.**
+**Sprint 03 (v0.3.0): Kafka + stateful window processing, checkpoint-isolated branches,
+late-arrival incident and historical recovery.** Includes all Sprint 01/02 code.
+
+## Sprint 03: run the new experiment now
+
+```bash
+python -m pip install -e '.[test]'
+python -m pytest -q
+PYTHONPATH=src python scripts/local_stream_demo.py --db artifacts/stateful-s03.db
+```
+
+Expected balances for `blue/acct-1`:
+
+| Branch | Blue balance | Why |
+|---|---:|---|
+| `stream-v1` | $255.00 | Counts duplicate $100; drops late $30 refund |
+| `stream-v2` | $155.00 | Removes duplicate; still drops late $30 refund |
+| `backfill-v2` | $125.00 | Rebuilds from all deliveries, deduplicates, includes refund |
+
+Each branch uses its own checkpoint contract. Trying to reuse a checkpoint
+with a different policy, window, schema revision or backfill mode **fails**.
+The local SQLite experiment is reproducible and fully tested; the new Spark
+and broker integrations are authored but **not yet executed** in this environment.
+
+To run a local Kafka broker/consumer, and eventually the Databricks jobs, see
+[**Sprint 03 runbook**](docs/SPRINT03-RUNBOOK.md) and
+[**ADR-003**](docs/ADR-003-stateful-recovery.md).
+
+New files: `src/temporalx/stateful.py`, `fixtures/streaming/`,
+`docker-compose.yml`, `scripts/local_stream_demo.py`,
+`scripts/produce_kafka.py`, `scripts/consume_to_local.py`,
+`streaming/databricks_stream.py`, Sprint 03 test suite.
+
+**Do not reuse production checkpoints or overwrite any production Delta table.**
+
+---
 
 > **Research code, not a payment processor.** Deliberately broken v1 financial
 > policy exists solely to prove replay divergence. Run the Databricks jobs in a
@@ -17,7 +52,7 @@
 | Quarantine for bad JSON and invalid schema | **Executed and tested** | Job code supplied (fails batch after quarantine) |
 | Delta Bronze / Silver logical event merge | N/A (SQLite reference engine instead) | **Requires actual Databricks execution** |
 | Delta Change Data Feed | N/A | Configured on UC tables; sandbox update demo supplied |
-| Streaming from Kafka, live CDC, scale benchmarks | Not in scope | **Not implemented**; next sprints |
+| Streaming from Kafka, live CDC, scale benchmarks | Kafka producer/consumer scripts and state reference engine authored | Databricks Spark streaming implemented as code; **not executed**, no live CDC or scale benchmarks |
 
 Do not mistake the local SQLite results for a Spark/Delta acceptance test.
 
