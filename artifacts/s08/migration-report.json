@@ -1,0 +1,29 @@
+{
+  "migration": {
+    "decision": "REVIEW_REQUIRED",
+    "mapped_stages": 3,
+    "production_cutover_authorized": false,
+    "project": "synthetic-azure-sql-ssis-adf-payments-modernization",
+    "unresolved_blockers": [
+      "Real SSIS .dtsx and ADF JSON inventory not supplied; only a synthetic representative pipeline is converted",
+      "Source CDC LSN availability and SQL Server snapshot isolation must be verified with a real source"
+    ]
+  },
+  "spark_test_executed": false,
+  "synthetic_reconciliation": {
+    "gold": [
+      {
+        "account_id": "acct-1",
+        "net_cents": 16000,
+        "tenant_id": "blue"
+      },
+      {
+        "account_id": "acct-x",
+        "net_cents": 7000,
+        "tenant_id": "red"
+      }
+    ],
+    "physical_deliveries": 7,
+    "silver_events": 4
+  }
+}

@@ -46,3 +46,19 @@
 - Structured Streaming progress metrics and watermark monitoring.
 - Validate Delta replay vs reference outputs under known microbatch ordering.
 - Flink vs Spark replay benchmark or state-store migration (separate research claim).
+
+## Sprint 07 — State Reconstruction & Forensic Diff
+- Executed locally: SHA-256-backed, tenant-scoped forensic bundles, strict
+  checkpoint/source alignment, synthetic divergence and full regression.
+- Databricks authored pending validation: frozen Delta seed, RocksDB aggregate
+  checkpoint, `state-metadata`/`statestore` inspection, independent batch oracle.
+- Follow-on research: distributed full outer state diff, checkpoint change
+  feed correlation, S07 incident injection on real Databricks with audit logs.
+
+## Sprint 08 — Lakehouse modernization + distributed state diff
+- [x] Offline reference assessment (Azure SQL/SSIS/ADF mapping, T-SQL/Spark SQL sample), synthetic CDC dedup and tombstone reconciliation.
+- [x] Authored Databricks Auto Loader Bronze, source-LSN Silver Delta MERGE, immutable Gold, CDF audit, RBAC/lineage research and A/B performance layouts.
+- [x] Deterministic first-divergence lab with incident that heals; distributed Spark State Reader comparator authored.
+- [ ] Execute Spark/Delta/UC/CDF/RocksDB tests in a real Databricks workspace with approved compute and audited source snapshot.
+- [ ] Migrate actual SSIS .dtsx and ADF JSON artifacts, then validate equivalence on real Azure SQL datasets.
+- [ ] Measure Photon, liquid clustering, partitioning and ZORDER with matched workload/cost evidence.

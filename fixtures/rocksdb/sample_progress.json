@@ -1,0 +1,20 @@
+[
+  {
+    "runId": "SYNTHETIC-example-not-a-real-spark-run", "batchId": 0, "numInputRows": 1000,
+    "durationMs": {"triggerExecution": 170}, "processedRowsPerSecond": 5800,
+    "stateOperators": [{"operatorName": "dedupe", "numRowsTotal": 950, "numRowsUpdated": 950,
+      "numRowsRemoved": 0, "numRowsDroppedByWatermark": 0, "memoryUsedBytes": 2000000,
+      "customMetrics": {"rocksdbSstFileSize": 400000, "rocksdbCommitCheckpointLatency": 25,
+        "rocksdbReadBlockCacheHitCount": 80, "rocksdbReadBlockCacheMissCount": 20,
+        "rocksdbWriterStallLatencyMs": 0, "numDroppedDuplicateRows": 50}}]
+  },
+  {
+    "runId": "SYNTHETIC-example-not-a-real-spark-run", "batchId": 1, "numInputRows": 1000,
+    "durationMs": {"triggerExecution": 230}, "processedRowsPerSecond": 4300,
+    "stateOperators": [{"operatorName": "dedupe", "numRowsTotal": 1200, "numRowsUpdated": 250,
+      "numRowsRemoved": 0, "numRowsDroppedByWatermark": 5, "memoryUsedBytes": 2500000,
+      "customMetrics": {"rocksdbSstFileSize": 550000, "rocksdbCommitCheckpointLatency": 42,
+        "rocksdbReadBlockCacheHitCount": 90, "rocksdbReadBlockCacheMissCount": 10,
+        "rocksdbWriterStallLatencyMs": 3, "numDroppedDuplicateRows": 745}}]
+  }
+]

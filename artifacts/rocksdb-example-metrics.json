@@ -1,0 +1,48 @@
+{
+  "metrics": {
+    "block_cache_hit_ratio": {
+      "max": 0.9,
+      "mean": 0.85,
+      "p50": 0.85,
+      "p95": 0.895,
+      "samples": 2
+    },
+    "checkpoint_ms": {
+      "max": 42.0,
+      "mean": 33.5,
+      "p50": 33.5,
+      "p95": 41.15,
+      "samples": 2
+    },
+    "sst_bytes": {
+      "max": 550000.0,
+      "mean": 475000.0,
+      "p50": 475000.0,
+      "p95": 542500.0,
+      "samples": 2
+    },
+    "state_rows": {
+      "max": 1200.0,
+      "mean": 1075.0,
+      "p50": 1075.0,
+      "p95": 1187.5,
+      "samples": 2
+    },
+    "trigger_ms": {
+      "max": 230.0,
+      "mean": 200.0,
+      "p50": 200.0,
+      "p95": 227.0,
+      "samples": 2
+    },
+    "writer_stall_ms": {
+      "max": 3.0,
+      "mean": 1.5,
+      "p50": 1.5,
+      "p95": 2.85,
+      "samples": 2
+    }
+  },
+  "operator_observations": 2,
+  "warnings": []
+}

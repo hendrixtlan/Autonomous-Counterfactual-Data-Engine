@@ -1,0 +1,10 @@
+{
+  "source_id": "temporalx.bronze.events", "sink_id": "temporalx.sandbox.sessions",
+  "group_keys": ["tenant_id", "account_id"], "operator_id": "session_tracker",
+  "logic_revision": "v2-new-semantics", "time_mode": "EventTime", "encoding": "avro",
+  "shuffle_partitions": 2, "watermark_ms": 300000,
+  "variables": [{"name": "session", "kind": "value", "ttl_ms": null,
+    "fields": [{"name": "first_event_ms", "dtype": "long", "nullable": false},
+               {"name": "last_event_ms", "dtype": "long", "nullable": false},
+               {"name": "event_count", "dtype": "int", "nullable": false}]}]
+}

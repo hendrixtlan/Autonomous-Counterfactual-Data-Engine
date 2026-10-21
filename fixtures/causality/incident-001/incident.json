@@ -1,0 +1,9 @@
+{
+  "incident_id": "INC-001-replay-divergence",
+  "tenant_id": "blue",
+  "events_file": "events.jsonl",
+  "progress_file": "progress.json",
+  "original_contract": "original.json",
+  "proposed_contract": "proposed.json",
+  "expected_stream_total_cents": 25500
+}
