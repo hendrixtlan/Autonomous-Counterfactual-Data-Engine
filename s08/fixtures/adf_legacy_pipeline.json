@@ -1,0 +1,10 @@
+{
+  "fixture_only": true,
+  "name": "ADF-SyntheticPaymentImport",
+  "activities": [
+    {"name": "CopyAzureSqlCDC", "type": "Copy", "dependsOn": [], "target": "UC Volume approved CDC landing"},
+    {"name": "ExecuteSSISCleanse", "type": "ExecuteSSISPackage", "dependsOn": ["CopyAzureSqlCDC"], "target": "Spark SQL Silver normalization and CDC consistency gate"},
+    {"name": "RefreshAccountMart", "type": "SqlServerStoredProcedure", "dependsOn": ["ExecuteSSISCleanse"], "target": "PySpark Gold aggregation + controlled snapshot"}
+  ],
+  "warning": "Synthetic activity inventory, not exportable ADF ARM JSON. Requires human migration and retry/transaction review."
+}

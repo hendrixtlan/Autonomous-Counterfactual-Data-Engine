@@ -1,5 +1,122 @@
 # TemporalX — Autonomous Counterfactual Data Engine
 
+**Sprint 08 (v0.8.0): Databricks Lakehouse Modernization + Distributed State Diff.**
+The complete Sprints 01–07 are retained. This sprint adds two research tracks:
+
+1. **Enterprise Lakehouse modernization:** an Azure SQL → SSIS → ADF *representative migration assessment*, synthetic CDC export fixtures, a real-code Databricks Auto Loader ingestion job, Delta Bronze/Silver/Gold transformations, source-LSN idempotent `MERGE`, a read-only CDF audit, Unity Catalog least-privilege SQL, lineage inspection, and layout/performance experiment configurations (Photon, partitioning, ZORDER, liquid clustering).
+2. **Microbatch time travel:** a deterministic offline timeline oracle and an authored **distributed** State Reader change-feed comparator using Spark joins/windows rather than a full-state `collect()`. A checkpoint must be isolated, retained and provenance-aligned; the comparator cannot authorize repair.
+
+### Sprint 08 — local verification (no Databricks account required)
+
+```bash
+python -m pip install -e '.[test]'
+python -m pytest -q
+python s08/assess_migration.py --out artifacts/s08/migration-report.json
+python scripts/time_travel_lab.py demo --out-dir artifacts/s08-time-travel
+```
+
+Synthetic migration result: seven physical CDC deliveries → four Silver business-event identities → two Gold account aggregates (**blue: 16,000 cents; red: 7,000 cents**). A synthetic time-travel anomaly first appears in microbatch **2** and heals by batch **4**; a final-state-only comparison would miss it.
+
+**Honest test boundary:** the Python reference path has been exercised locally. **No Databricks workspace, actual Auto Loader, Photon, Delta CDF, UC lineage, native RocksDB or state reader has been executed for Sprint 08 here.** Source migrations are representative mappings only, not a real SSIS/ADF deployment. Databricks jobs require an explicitly pre-provisioned `lab_` or `temporalx_lab` UC schema and authorized source landing; no production cutover is authorized. Prior sprints' Databricks code also remains unvalidated unless otherwise stated.
+
+**Docs:** [Sprint 08 runbook](docs/SPRINT08-RUNBOOK.md), [ADR-008](docs/ADR-008-lakehouse-modernization.md), [synthetic migration manifest](s08/fixtures/legacy_migration.json), [T-SQL source](s08/sql/legacy_azure_sql.sql) vs [Spark SQL example](s08/sql/translated_spark.sql), [benchmark matrix](s08/benchmark_matrix.yml), [checkpoint time travel core](src/temporalx/time_travel.py), [distributed state diff](s08/distributed_diff.py).
+
+---
+
+
+**Sprint 07 (v0.7.0): State Reconstruction & Forensic Diff.** The existing Sprints
+01–06 are retained. New features: strict state provenance contract, tamper-evident
+logical state bundles, deterministic replay oracle, key-by-key forensic diff,
+operator-schema projection, tests for missing/phantom/wrong accounts, and a
+three-stage Databricks research workflow (`freeze Delta -> RocksDB state ->
+read-only checkpoint compare`). No repair/promotion occurs automatically.
+
+```bash
+python -m pip install -e '.[test]'
+python -m pytest -q
+python scripts/forensic_diff.py demo --out-dir artifacts/s07-demo
+python scripts/forensic_diff.py compare \
+  --reference artifacts/s07-demo/reference.json \
+  --observed artifacts/s07-demo/observed-synthetic.json \
+  --out artifacts/s07-demo/rechecked-report.json
+```
+
+**Local fixture result:** 8 matching, 1 missing, 1 phantom and 1 different
+amount. The observed checkpoint is **synthetic**, not an actual RocksDB export.
+The Databricks bundle and `s07/databricks_lab.py` are authored but **NOT run on
+a Databricks cluster in this environment**. Actual state reader schemas must be
+validated in the workspace and mapped explicitly. The lab caps state evidence
+at 10,000 rows and uses isolated UC tables/Volumes with no production writes.
+
+See [Sprint 07 runbook](docs/SPRINT07-RUNBOOK.md),
+[ADR-007](docs/ADR-007-state-forensic-diff.md),
+[local test report](docs/SPRINT07-TEST-REPORT.md) and
+[JSON schema](schemas/forensic-account-state-v1.schema.json).
+
+---
+
+**Sprint 06 (v0.6.0): Evidence-first State Causality & Autonomous Recovery Research.** Contains **all Sprint 01–05 artifacts**. The core incident investigator now produces deterministic, SHA-256-anchored evidence reports, tenant-isolated policy replays, RocksDB progress assessments, and fail-closed repair recommendations. Optional LangGraph is a real orchestrator of the same tools; no LLM-based causal certainty is claimed.
+
+### Run the new incident study
+
+```bash
+python -m pip install -e '.[test]'
+python -m pytest -q
+python scripts/causality_investigate.py --incident-dir fixtures/causality/incident-001 --out reports/my-investigation.json
+python scripts/causality_investigate.py --incident-dir fixtures/causality/incident-001 --verify reports/my-investigation.json
+# Optional real LangGraph compiled graph (requires installation):
+python -m pip install -e '.[agent]'
+python scripts/causality_investigate.py --engine langgraph --incident-dir fixtures/causality/incident-001 --out reports/my-langgraph-investigation.json
+```
+
+The sample case includes one duplicate delivery and a late-arriving refund. Historical v1 produces $225; v2 produces $125; reported streaming balance $255 is a **separate observation** because the online watermark may have excluded events. Result: `PROPOSE_ISOLATED_REBUILD`, **not** permission to modify production or reuse the checkpoint. Input files are synthetically generated. No actual Databricks/RocksDB experiment or LangGraph/MLflow integration test was performed in this build environment.
+
+See [ADR-006](docs/ADR-006-causal-recovery.md), [Sprint 06 runbook](docs/SPRINT06-RUNBOOK.md) and [test evidence](docs/SPRINT06-TEST-REPORT.md). Databricks has a separate read-only RocksDB checkpoint metadata job that must be explicitly executed against a synthetic UC Volume checkpoint.
+
+---
+
+**Sprint 05 (v0.5.0): Stateful Intelligence & Schema Evolution Gate.** All Sprint 01–04 files are retained.
+
+This release adds **two different** row-based Databricks `transformWithState` probes: processing-time `MapState` TTL and event-time `ValueState` timers, along with a conservative state-contract migration gate, a deterministic reference engine, metrics-based rules advisor, and forensic state reader.
+
+**Verified locally:** Python regression, contract classifications and reference simulation. **Not verified:** actual Spark/Databricks execution, native RocksDB, checkpoint format migrations or performance benchmarking.
+
+```bash
+PYTHONPATH=src python -m pytest -q
+PYTHONPATH=src python scripts/state_intelligence_demo.py simulate
+PYTHONPATH=src python scripts/state_intelligence_demo.py upgrade \
+  --old fixtures/state_intelligence/contract-v1.json \
+  --new fixtures/state_intelligence/contract-v2-compatible.json
+PYTHONPATH=src python scripts/state_intelligence_demo.py diagnose \
+  --progress fixtures/rocksdb/sample_progress.json
+```
+
+Key distinction: **a compatible state schema is not proof of semantic correctness**. The gate never approves production mutation. A changed logic revision requires isolated replay and reconciliation against the historical archive.
+
+Start with [Sprint 05 runbook](docs/SPRINT05-RUNBOOK.md), [ADR-005](docs/ADR-005-state-intelligence.md), and [test report](docs/SPRINT05-TEST-REPORT.md). Databricks bundles include explicitly invoked `temporalx_sprint05_ttl` and `temporalx_sprint05_timers` research jobs; requires DBR >=17.3 LTS and UC sandbox; not executed here.
+
+---
+
+**Sprint 04 (v0.4.0): RocksDB Deep Recovery Lab.** Includes all Sprint 01–03 code, fixtures, tests, Kafka, Delta, and stateful replay.
+
+This release adds a versioned Spark RocksDB experiment, fault injection after an
+idempotent sink write, changelog-vs-snapshot branches, tunable memory/cache/
+compaction settings, a Spark query progress analyzer and a Databricks state
+inspection tool. **Only Python unit/regression tests ran here; actual Spark and
+Databricks execution must still be performed by the user in a compatible runtime.**
+
+```bash
+PYTHONPATH=src python -m pytest -q
+PYTHONPATH=src python scripts/prepare_rocksdb_fixture.py --output artifacts/rocksdb-input --accounts 20
+PYTHONPATH=src python scripts/rocksdb_metrics_report.py --input fixtures/rocksdb/sample_progress.json
+# On an environment with PySpark >=3.5 installed:
+PYTHONPATH=src python rocksdb/local_spark.py --input artifacts/rocksdb-input --root artifacts/rocksdb-runs --branch changelog_a --strategy changelog
+```
+
+**Start with [Sprint 04 runbook](docs/SPRINT04-RUNBOOK.md), [ADR-004](docs/ADR-004-rocksdb-recovery.md), and [Sprint 04 test report](docs/SPRINT04-TEST-REPORT.md).** The metrics sample is synthetic, not measured Spark performance.
+
+---
+
 **Sprint 03 (v0.3.0): Kafka + stateful window processing, checkpoint-isolated branches,
 late-arrival incident and historical recovery.** Includes all Sprint 01/02 code.
 

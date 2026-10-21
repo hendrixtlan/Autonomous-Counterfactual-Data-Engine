@@ -1,0 +1,9 @@
+{
+  "project": "synthetic-azure-sql-ssis-adf-payments-modernization",
+  "mappings": [
+    {"source_stage":"azure_sql_extract","source_logic":"Azure SQL export of payment event CDC via controlled storage landing","target_component":"autoloader_bronze","validation":"Every extracted LSN represented in append-only Bronze; source counts and checksums reconcile"},
+    {"source_stage":"ssis_transform","source_logic":"SSIS Derived Column + Lookup + conditional split + T-SQL ROW_NUMBER latest CDC","target_component":"spark_sql_silver","validation":"Equal unique event identities and winning source_lsn for replayed source snapshot"},
+    {"source_stage":"adf_orchestrate","source_logic":"ADF Copy / SSIS Execute / Stored Procedure activity dependency graph","target_component":"lakeflow_jobs","validation":"Task dependency, retry, idempotency, secrets, alerting and recovery acceptance tests"}
+  ],
+  "known_blockers": ["Real SSIS .dtsx and ADF JSON inventory not supplied; only a synthetic representative pipeline is converted", "Source CDC LSN availability and SQL Server snapshot isolation must be verified with a real source"]
+}

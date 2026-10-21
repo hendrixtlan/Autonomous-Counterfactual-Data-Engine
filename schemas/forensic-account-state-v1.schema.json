@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TemporalX logical state forensic bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "metadata", "rows", "sha256"],
+  "properties": {
+    "format": {"const": "temporalx.account-state.v1"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state_kind", "source_snapshot_id", "source_sha256", "policy", "operator_revision", "checkpoint_batch_id", "operator_id", "watermark_policy", "tenant_scope", "currency", "origin"],
+      "properties": {
+        "state_kind": {"const": "account-net-cents-v1"},
+        "source_snapshot_id": {"type": "string", "minLength": 1},
+        "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "policy": {"enum": ["v1", "v2"]},
+        "operator_revision": {"type": "string", "minLength": 1},
+        "checkpoint_batch_id": {"type": "integer", "minimum": 0},
+        "operator_id": {"type": "integer", "minimum": 0},
+        "watermark_policy": {"type": "string", "minLength": 1},
+        "tenant_scope": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "currency": {"const": "USD"},
+        "origin": {"enum": ["replay", "checkpoint", "synthetic-checkpoint"]}
+      }
+    },
+    "rows": {"type": "array", "items": {"type": "object", "required": ["tenant_id", "account_id", "net_cents"], "additionalProperties": false,
+      "properties": {"tenant_id": {"type": "string"}, "account_id": {"type": "string"}, "net_cents": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807}}}},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

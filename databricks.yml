@@ -15,9 +15,34 @@ variables:
   kafka_topic:
     description: Synthetic topic; use a disposable Kafka namespace
     default: temporalx.transactions
+  forensic_evidence_root:
+    description: Pre-created isolated Unity Catalog Volume path for immutable Sprint 07 evidence files
+    default: /Volumes/REPLACE_ME/schema/volume/forensic_evidence
   checkpoint_root:
     description: Pre-created UC Volume checkpoint path; must begin with /Volumes/
     default: /Volumes/REPLACE_ME/schema/volume/checkpoints
+
+  lakehouse_source_volume:
+    description: UC Volume folder with synthetic authorized Azure SQL CDC extracts, each line JSON
+    default: /Volumes/REPLACE_ME/lab_temporalx/input/landing
+  lakehouse_checkpoint_volume:
+    description: Separate existing UC Volume folder for Auto Loader checkpoints and schema metadata
+    default: /Volumes/REPLACE_ME/lab_temporalx/state/checkpoints
+  lakehouse_gold_branch:
+    description: Fresh immutable Gold branch, change for every successful Gold run
+    default: trial_a
+  s08_reference_checkpoint:
+    description: Explicit isolated state checkpoint branch from reference processor
+    default: /Volumes/REPLACE_ME/lab_temporalx/checkpoints/reference
+  s08_observed_checkpoint:
+    description: Explicit isolated state checkpoint branch from observed processor
+    default: /Volumes/REPLACE_ME/lab_temporalx/checkpoints/observed
+  s08_reference_manifest:
+    description: Provenance JSON path in UC Volume for reference branch
+    default: /Volumes/REPLACE_ME/lab_temporalx/evidence/reference.json
+  s08_observed_manifest:
+    description: Provenance JSON path in UC Volume for observed branch
+    default: /Volumes/REPLACE_ME/lab_temporalx/evidence/observed.json
 
 resources:
   jobs:
@@ -123,6 +148,162 @@ resources:
           spark_python_task:
             python_file: ./streaming/databricks_stream.py
             parameters: [backfill, --catalog, '${var.catalog}', --schema, '${var.schema}', --branch, repair_001]
+
+    # S04 controlled A/B. Runs against synthetic S03 Bronze table in lab UC schema.
+    # Changelog and snapshot MUST use isolated branches/checkpoints.
+    temporalx_sprint04_changelog:
+      name: temporalx-sprint04-rocksdb-changelog
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: rocksdb_changelog
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./rocksdb/databricks_experiment.py
+            parameters: [--catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --branch, change_a, --strategy, changelog]
+
+    temporalx_sprint04_snapshot:
+      name: temporalx-sprint04-rocksdb-snapshot
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: rocksdb_snapshot
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./rocksdb/databricks_experiment.py
+            parameters: [--catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --branch, snapshot_a, --strategy, snapshot]
+
+    # S05: synthetic rate-source probe, separate Delta sinks and UC Volume checkpoints.
+    # For row-based transformWithState, use Databricks Runtime >=17.3 LTS.
+    temporalx_sprint05_ttl:
+      name: temporalx-sprint05-processingtime-ttl
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: probe_ttl
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./state_lab/databricks_tws.py
+            parameters: [--mode, ttl, --catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --branch, ttl_v1, --run-seconds, '60', --ttl-ms, '8000']
+    temporalx_sprint05_timers:
+      name: temporalx-sprint05-eventtime-timers
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: probe_timers
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./state_lab/databricks_tws.py
+            parameters: [--mode, timer, --catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --branch, timer_v1, --run-seconds, '60', --inactivity-ms, '5000']
+
+    # S06: inspection only; explicitly invoke on a synthetic Sprint 05 checkpoint.
+    # No repair or checkpoint writes. DBR and privileges must be validated in workspace.
+    temporalx_sprint06_forensic_metadata:
+      name: temporalx-sprint06-readonly-forensics
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: inspect_state_metadata
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./causality/databricks_forensics.py
+            parameters: [--checkpoint, '${var.checkpoint_root}/s05/timer_timer_v1', --state-var, session, --operator-id, '0']
+
+    # S07: explicit consecutive tasks. Seed pins an exact Delta version, then
+    # Spark materializes RocksDB operator 0, then read-only checkpoint forensics.
+    # Set source_version from sandbox Delta DESCRIBE HISTORY before executing.
+    temporalx_sprint07_forensic_diff:
+      name: temporalx-sprint07-rocksdb-forensic-diff
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: freeze_bronze_snapshot
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s07/databricks_lab.py
+            parameters: [seed, --catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --evidence-root, '${var.forensic_evidence_root}', --branch, forensic_a, --tenant, blue, --source-version, '0']
+        - task_key: materialize_rocksdb_state
+          depends_on:
+            - task_key: freeze_bronze_snapshot
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s07/databricks_lab.py
+            parameters: [stream, --catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --evidence-root, '${var.forensic_evidence_root}', --branch, forensic_a, --tenant, blue]
+        - task_key: read_checkpoint_and_reconcile
+          depends_on:
+            - task_key: materialize_rocksdb_state
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s07/databricks_lab.py
+            parameters: [compare, --catalog, '${var.catalog}', --schema, '${var.schema}', --checkpoint-root, '${var.checkpoint_root}', --evidence-root, '${var.forensic_evidence_root}', --branch, forensic_a, --tenant, blue, --operator-id, '0']
+
+    # S08: explicitly invoked, lab_* / temporalx_lab* schema only. Requires
+    # staged synthetic source files in a *pre-created* UC Volume. Do not put
+    # real financial or PII data in the research environment.
+    temporalx_sprint08_lakehouse:
+      name: temporalx-sprint08-azure-sql-modernization-lab
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: create_lab_tables
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s08/databricks_lakehouse.py
+            parameters: [bootstrap, --catalog, '${var.catalog}', --schema, '${var.schema}']
+        - task_key: autoloader_to_bronze
+          depends_on:
+            - task_key: create_lab_tables
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s08/databricks_lakehouse.py
+            parameters: [bronze, --catalog, '${var.catalog}', --schema, '${var.schema}', --source-volume, '${var.lakehouse_source_volume}', --checkpoint-volume, '${var.lakehouse_checkpoint_volume}']
+        - task_key: silver_source_lsn_merge
+          depends_on:
+            - task_key: autoloader_to_bronze
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s08/databricks_lakehouse.py
+            parameters: [silver, --catalog, '${var.catalog}', --schema, '${var.schema}']
+        - task_key: immutable_gold_snapshot
+          depends_on:
+            - task_key: silver_source_lsn_merge
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s08/databricks_lakehouse.py
+            parameters: [gold, --catalog, '${var.catalog}', --schema, '${var.schema}', --branch, '${var.lakehouse_gold_branch}']
+
+    temporalx_sprint08_cdf_audit:
+      name: temporalx-sprint08-silver-cdf-audit
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: read_only_cdf_summary
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s08/databricks_lakehouse.py
+            parameters: [cdf, --catalog, '${var.catalog}', --schema, '${var.schema}', --start-version, '0']
+
+    temporalx_sprint08_layout_preview:
+      name: temporalx-sprint08-layout-preview-no-writes
+      tasks:
+        - task_key: explain_liquid_sql
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s08/databricks_lakehouse.py
+            parameters: [layout, --catalog, '${var.catalog}', --schema, '${var.schema}', --branch, '${var.lakehouse_gold_branch}', --layout, liquid]
+
+    temporalx_sprint08_lineage_audit:
+      name: temporalx-sprint08-readonly-uc-lineage-audit
+      tasks:
+        - task_key: scan_visible_system_lineage
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s08/databricks_lakehouse.py
+            parameters: [lineage, --catalog, '${var.catalog}', --schema, '${var.schema}']
+
+    # Research-only; manifests + checkpoints MUST exist and be from the same
+    # source snapshot. Requires DBR >= 16.4 LTS and compatible dedicated compute.
+    temporalx_sprint08_distributed_diff:
+      name: temporalx-sprint08-distributed-state-diff
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: read_state_changelog_and_diff
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./s08/distributed_diff.py
+            parameters: [--catalog, '${var.catalog}', --schema, '${var.schema}', --branch, '${var.lakehouse_gold_branch}', --reference-checkpoint, '${var.s08_reference_checkpoint}', --observed-checkpoint, '${var.s08_observed_checkpoint}', --reference-manifest, '${var.s08_reference_manifest}', --observed-manifest, '${var.s08_observed_manifest}']
 
 targets:
   dev:

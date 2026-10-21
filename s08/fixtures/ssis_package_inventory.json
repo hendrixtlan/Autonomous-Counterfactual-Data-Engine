@@ -1,0 +1,12 @@
+{
+  "fixture_only": true,
+  "package": "Payments_Reconcile.dtsx (synthetic inventory; not a deployable package)",
+  "source": "OLE DB Source, Azure SQL dbo.PaymentEventCDC",
+  "components": [
+    {"ssis":"Derived Column", "spark":"withColumn signed_cents / CASE WHEN kind=CAPTURE"},
+    {"ssis":"Lookup tenant+event CDC", "spark":"ROW_NUMBER by source_lsn desc; partition tenant/event"},
+    {"ssis":"Conditional Split", "spark":"DQ filter and blocking conflict checks"},
+    {"ssis":"OLE DB Destination", "spark":"Delta Silver MERGE by source_lsn"}
+  ],
+  "caveats": ["SSIS data types/collation/timezone differ from Spark", "SSIS restart semantics and ADF retries must be assessed"]
+}

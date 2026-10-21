@@ -1,0 +1,21 @@
+# Research plan; NO measured results are present in this file.
+workloads:
+  - name: gold_sql_aggregate
+    engines: [STANDARD, PHOTON]
+    layouts: [unoptimized_delta, zorder_legacy, partition_by_tenant, liquid_clustered]
+    controls:
+      - same input Delta version and same Gold logical checksum
+      - same compute size/worker family, fixed Spark/DBR release
+      - same cluster warmup and result cache policies
+      - minimum 5 warm runs and 5 cold runs for each scenario
+      - capture explain plan, input scan bytes, shuffle metrics, wall time and DBUs
+  - name: rocksdb_stateful
+    engines: [STANDARD]
+    layouts: [not_applicable]
+    controls:
+      - native RocksDB memory/cache/stall/compaction metrics and checkpoint recovery time
+      - never attribute RocksDB stateful operator acceleration to Photon
+notes:
+  - Databricks recommends liquid clustering over partitions/ZORDER on new Delta tables.
+  - Partitioning is a controlled counterexample because tenant cardinality and skew can cause harm.
+  - Real benchmarks require Databricks execution and cost/engine attestation.
